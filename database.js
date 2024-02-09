@@ -88,9 +88,37 @@ async function insertVideoDetail(connectionDB, data) {
     });
 }
 
-async function getFollowVideos(socket, connectionDB, username) {}
+async function eventLike(socket, connectionDB, data, f) {
+    if (f) {
+        const query = `INSERT into like_details VALUES ?`;
+        const values = [[data.video_id, data.user_id]];
+        await connectionDB.query(query, [values], (err, result) => {
+            if (!err) {
+                console.log(`${data.user_id} liked ${data.video_id}`);
+            }
+        });
+    } else {
+        const query = `DELETE from like_details WHERE video_id = ? AND user_id = ?`;
+        const values = [data.video_id, data.user_id];
+        await connectionDB.query(query, values, (err, result) => {
+            if (!err) {
+                console.log(`${data.user_id} unliked ${data.video_id}`);
+            }
+        });
+    }
 
-async function eventLike(socket, connectionDB, data, f) {}
+    var query = "";
+    if (f) query = "UPDATE video_details SET likes = likes + 1 WHERE id = ?";
+    else query = "UPDATE video_details SET likes = likes - 1 WHERE id = ?";
+
+    const values = [data.video_id];
+    await connectionDB.query(query, values, (err, res) => {
+        if (!err) {
+            console.log(`updated ${data.video_id}'s like count`);
+        }
+    });
+}
+
 async function eventFollow(socket, connectionDB, data, f) {
     if (f) {
         const query = `INSERT into follow_details VALUES ?`;
@@ -166,7 +194,6 @@ module.exports = {
     loginProcess,
     insertVideoDetail,
     getVideos,
-    getFollowVideos,
     eventLike,
     eventFollow,
     likedVideoList,

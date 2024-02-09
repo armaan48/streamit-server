@@ -13,6 +13,7 @@ const {
     loginProcess,
     insertVideoDetail,
     getVideos,
+    eventLike,
     eventFollow,
     likedVideoList,
     followingList,
@@ -116,7 +117,8 @@ io.on("connection", (socket) => {
     socket.on("give-video-list",  (query) => {
         getVideos(socket, connectionDB, query);
     });
-    socket.on("give-following-videos-list",  (username) => {
+    socket.on("give-following-video-list",  (username) => {
+        console.log("called")
         followingVideoList(socket, connectionDB, username);
     });
 
