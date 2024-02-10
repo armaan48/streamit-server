@@ -2,7 +2,8 @@ const projectId = "silken-inverter-407512";
 
 
 
-const location = "asia-south1";
+const transcoder_location = "asia-south1";
+const livestream_location = "asia-east2";
 const bucketName = "video-streamit/";
 const preset = "preset/web-hd";
 const templateId = 'streamit-video-template';
@@ -18,5 +19,4 @@ const hostip = "34.131.120.230"
 
 
 
-
-module.exports = {projectId , location , bucketName , preset , user , password , region , INSTANCE_CONNECTION_NAME , database , hostip,templateId}
+module.exports = {projectId , transcoder_location , livestream_location , bucketName , preset , user , password , region , INSTANCE_CONNECTION_NAME , database , hostip,templateId}

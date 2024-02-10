@@ -1,4 +1,4 @@
-const {bucketName , preset,location, projectId , templateId} = require("./credentials")
+const {bucketName , preset,trancoder_location, projectId , templateId} = require("./credentials")
 
 
 
@@ -7,14 +7,14 @@ async function makeJob(socket , fileID , transcoderServiceClient) {
     const outputUri = `gs://${bucketName}${fileID}/output/`;
 
     var request =[ {
-        parent: transcoderServiceClient.locationPath(projectId, location),
+        parent: transcoderServiceClient.locationPath(projectId, trancoder_location),
         job: {
             inputUri: inputUri,
             outputUri: outputUri,
             templateId: preset,
         },
     },{
-        parent: transcoderServiceClient.locationPath(projectId, location),
+        parent: transcoderServiceClient.locationPath(projectId, trancoder_location),
         job: {
             inputUri: inputUri,
             outputUri: outputUri,
@@ -32,7 +32,7 @@ async function makeJob(socket , fileID , transcoderServiceClient) {
 async function getJob(socket , jobid , transcoderServiceClient) {
     console.log("Trying", jobid);
     const request = {
-        name: transcoderServiceClient.jobPath(projectId, location, jobid),
+        name: transcoderServiceClient.jobPath(projectId, trancoder_location, jobid),
     };
     const [response] = await transcoderServiceClient.getJob(request);
     console.log(`job-state:`, response.state);

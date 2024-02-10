@@ -20,25 +20,42 @@ const {
     followingVideoList,
     updateWatchMins,
     incrementViews,
-    searchVideoList
+    searchVideoList,
 } = require("./database");
 const {
     projectId,
-    location,
+    transcoder_location,
+    livestream_location,
     bucketName,
     user,
     password,
     database,
     hostip,
 } = require("./credentials");
+
+const {
+    createInput,
+    getInput,
+    listInputs,
+    deleteInput,
+    createChannel,
+    getChannel,
+    startChannel,
+    stopChannel,
+    deleteChannel,
+} = require("./livestream");
+
 const fs = require("fs");
 const { TranscoderServiceClient } =
     require("@google-cloud/video-transcoder").v1;
+const { LivestreamServiceClient } = require("@google-cloud/livestream").v1;
+const livestreamServiceClient = new LivestreamServiceClient();
 const { Storage } = require("@google-cloud/storage");
 
 const storage = new Storage({
     projectId: projectId,
 });
+const transcoderServiceClient = new TranscoderServiceClient();
 const connectionDB = mysql.createConnection({
     host: hostip, // Cloud SQL instance IP (use 'localhost' for local development)
     user: user,
@@ -53,12 +70,9 @@ connectionDB.connect((err) => {
         console.log("connected to sql");
     }
 });
-const transcoderServiceClient = new TranscoderServiceClient();
 const { v4 } = require("uuid");
-const { connect } = require("http2");
-var fileID = "nothing";
-var inputUri;
-var outputUri;
+var videoID = "nothing";
+var liveStreamID = "nothing"
 
 const app = express();
 app.use(cors());
@@ -117,21 +131,21 @@ io.on("connection", (socket) => {
     socket.on("give-following-list", (username) => {
         followingList(socket, connectionDB, username);
     });
-    socket.on("give-video-list",  (query) => {
+    socket.on("give-video-list", (query) => {
         getVideos(socket, connectionDB, query);
     });
-    socket.on("give-following-video-list",  (username) => {
-        console.log("called")
+    socket.on("give-following-video-list", (username) => {
+        console.log("called");
         followingVideoList(socket, connectionDB, username);
     });
-    socket.on("give-search-video-list" , (keyword)=>{
-        searchVideoList(socket , connectionDB , keyword);
-    })
+    socket.on("give-search-video-list", (keyword) => {
+        searchVideoList(socket, connectionDB, keyword);
+    });
 
     // video
     socket.on("send-video-details", (data) => {
-        fileID = v4();
-        data = { ...data, id: fileID };
+        videoID = v4();
+        data = { ...data, id: videoID };
         insertVideoDetail(connectionDB, data);
         console.log("asking for thumnail");
         socket.emit("give-video-thumbnail");
@@ -139,21 +153,21 @@ io.on("connection", (socket) => {
 
     socket.on("send-video", (base64data) => {
         console.log("recieving video chunk");
-        uploadLocal(`/video/${fileID}.mp4`, base64data, socket, "video");
+        uploadLocal(`/video/${videoID}.mp4`, base64data, socket, "video");
     });
     socket.on("video-uploaded", async (data) => {
         console.log("file-uploaded successfully\n");
         socket.emit("file-uploaded", {});
-        await uploadStorage(socket, fileID, "video", storage, bucketName);
-        await uploadStorage(socket, fileID, "thumbnail", storage, bucketName);
-        // await makeJob(socket  , fileID ,transcoderServiceClient);
+        await uploadStorage(socket, videoID, "video", storage, bucketName);
+        await uploadStorage(socket, videoID, "thumbnail", storage, bucketName);
+        // await makeJob(socket  , videoID ,transcoderServiceClient);
     });
 
     // video-thumbnail
     socket.on("send-video-thumbnail", (base64data) => {
         console.log("recieving video-thumbnail chunk");
         uploadLocal(
-            `/thumbnail/${fileID}.png`,
+            `/thumbnail/${videoID}.png`,
             base64data,
             socket,
             "video-thumbnail"
@@ -163,17 +177,29 @@ io.on("connection", (socket) => {
         socket.emit("give-video");
     });
 
-    // live-thumbnail { INCOMPLETE }
+
+
+    // live
+    socket.on("send-live-details" , async (data)=>{
+        liveStreamID = v4();
+        data = { ...data, id: liveStreamID };
+        // const channelId = await getEndpoint();
+        insertVideoDetail(connectionDB, data , 1);
+        console.log("asking for thumbnail");
+        socket.emit("give-live-thumbnail");
+    })
     socket.on("send-live-thumbnail", (base64data) => {
         console.log("recieving live-thumbnail chunk");
         uploadLocal(
-            `/thumbnail/${fileID}.png`,
+            `/thumbnail/${liveStreamID}.png`,
             base64data,
             socket,
             "live-thumbnail"
         );
     });
-    socket.on("live-thumbnail-uploaded", (data) => {});
+    socket.on("live-thumbnail-uploaded", (data) => {
+        uploadStorage(socket ,liveStreamID , "thumbnail" , storage , "video-streamit");
+    });
 
     // dp
     socket.on("send-dp", async (base64data) => {
@@ -181,7 +207,7 @@ io.on("connection", (socket) => {
     });
     socket.on("dp-uploaded", async (data) => {
         await uploadDp(userName, storage, "user-streamit/");
-    });    
+    });
 
     // like , unlike ,  follow unfollow
     socket.on("like", async (data) => {
@@ -196,15 +222,15 @@ io.on("connection", (socket) => {
     socket.on("unfollow", async (data) => {
         eventFollow(socket, connectionDB, data, 0);
     });
-    socket.on("send-watch-mins" , async (data)=>{
-        updateWatchMins(connectionDB , data);
-    })
-    socket.on("increment-views" , async (video_id)=>{
-        incrementViews(connectionDB , video_id)
-    })
-
+    socket.on("send-watch-mins", async (data) => {
+        updateWatchMins(connectionDB, data);
+    });
+    socket.on("increment-views", async (video_id) => {
+        incrementViews(connectionDB, video_id);
+    });
 
     socket.on("disconnect", (reason, detail) => {
         console.log("disconnected", reason, detail);
     });
 });
+

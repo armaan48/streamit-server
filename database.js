@@ -57,13 +57,10 @@ async function getVideos(socket, connectionDB, data) {
     });
 }
 
-async function insertVideoDetail(connectionDB, data) {
+async function insertVideoDetail(connectionDB, data , f) {
     const query = `INSERT into video_details VALUES ?`;
     let date = new Date();
-    let creationTime =
-        date.toISOString().split("T")[0] +
-        " " +
-        date.toTimeString().split(" ")[0];
+    let creationTime = date.getTime()
     const values = [
         [
             data.id,
@@ -75,7 +72,7 @@ async function insertVideoDetail(connectionDB, data) {
             0,
             0,
             0,
-            0,
+            f,
         ],
     ];
     console.log("trying to insert:", values[0]);
@@ -222,6 +219,10 @@ async function searchVideoList(socket, connectionDB, keyword) {
             console.log(err)
         }
     })
+}
+
+async function getEndpoint(socket , connectionDB , livestreamServiceClient ){
+
 }
 
 module.exports = {

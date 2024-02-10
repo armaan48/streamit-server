@@ -2,13 +2,13 @@ const fs  = require("fs");
 const path = require("path");
 
 
-async function uploadStorage(socket , fileID , type, storage ,bucketName ){
+async function uploadStorage(socket , fileID , type, storage ,bucketName  ){
     console.log(`trying  ${fileID} ${type}`)
     var fileName = fileID;
     if (type == "video"){
         fileName += ".mp4";
     }else{
-        fileName += ".png";
+        fileName += ".png";     
     }
     const bucket = storage.bucket(bucketName);
     const filePath = path.join(__dirname , `/${type}/${fileName}`);
