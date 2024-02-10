@@ -18,6 +18,9 @@ const {
     likedVideoList,
     followingList,
     followingVideoList,
+    updateWatchMins,
+    incrementViews,
+    searchVideoList
 } = require("./database");
 const {
     projectId,
@@ -121,6 +124,9 @@ io.on("connection", (socket) => {
         console.log("called")
         followingVideoList(socket, connectionDB, username);
     });
+    socket.on("give-search-video-list" , (keyword)=>{
+        searchVideoList(socket , connectionDB , keyword);
+    })
 
     // video
     socket.on("send-video-details", (data) => {
@@ -133,7 +139,7 @@ io.on("connection", (socket) => {
 
     socket.on("send-video", (base64data) => {
         console.log("recieving video chunk");
-        uploadLocal(`/video/${fileID}.mp4`, base64data, socket, "thumbnail");
+        uploadLocal(`/video/${fileID}.mp4`, base64data, socket, "video");
     });
     socket.on("video-uploaded", async (data) => {
         console.log("file-uploaded successfully\n");
@@ -190,6 +196,13 @@ io.on("connection", (socket) => {
     socket.on("unfollow", async (data) => {
         eventFollow(socket, connectionDB, data, 0);
     });
+    socket.on("send-watch-mins" , async (data)=>{
+        updateWatchMins(connectionDB , data);
+    })
+    socket.on("increment-views" , async (video_id)=>{
+        incrementViews(connectionDB , video_id)
+    })
+
 
     socket.on("disconnect", (reason, detail) => {
         console.log("disconnected", reason, detail);

@@ -187,6 +187,42 @@ async function followingList(socket, connectionDB, username) {
         }
     });
 }
+async function updateWatchMins(connectionDB, data) {
+    const query =
+        "UPDATE video_details SET watch_mins = watch_mins + ? WHERE id = ?";
+    const values = [data.watch_mins, data.video_id];
+    connectionDB.query(query, values, (err, res) => {
+        if (!err) {
+            console.log(
+                `watch mins updated ${data.video_id} by ${data.watch_mins}`
+            );
+        }
+    });
+}
+async function incrementViews(connectionDB, video_id) {
+    const query = "UPDATE video_details SET views = views + ? WHERE id = ?";
+    const values = [1, video_id];
+    connectionDB.query(query, values, (err, res) => {
+        if (!err) {
+            console.log(`views incremented ${video_id}`);
+        }
+    });
+}
+
+async function searchVideoList(socket, connectionDB, keyword) {
+    const query = `SELECT * FROM video_details
+                    WHERE MATCH(title, tags, description) AGAINST (?)`;
+    const values = [keyword];
+    connectionDB.query(query , values , (err , res)=>{
+        if (!err){
+            var videoList = JSON.parse(JSON.stringify(res));
+            console.log(`${keyword} search result len ${videoList} `)
+            socket.emit("send-search-video-list" , videoList)
+        }else{
+            console.log(err)
+        }
+    })
+}
 
 module.exports = {
     signupProcess,
@@ -199,4 +235,7 @@ module.exports = {
     likedVideoList,
     followingVideoList,
     followingList,
+    updateWatchMins,
+    incrementViews,
+    searchVideoList
 };
