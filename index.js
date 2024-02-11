@@ -7,6 +7,7 @@ const path = require("path");
 const { deleteLocal, uploadLocal } = require("./localFileManager");
 const { uploadStorage, uploadDp } = require("./cloudStorage");
 const { makeJob, getJob } = require("./transcoder");
+const cron = require("node-cron");
 const {
     signupProcess,
     insertSignUpData,
@@ -21,6 +22,9 @@ const {
     updateWatchMins,
     incrementViews,
     searchVideoList,
+    getEndpoint,
+    releaseChannel,
+    deleteLiveVideos
 } = require("./database");
 const {
     projectId,
@@ -71,8 +75,6 @@ connectionDB.connect((err) => {
     }
 });
 const { v4 } = require("uuid");
-var videoID = "nothing";
-var liveStreamID = "nothing"
 
 const app = express();
 app.use(cors());
@@ -144,61 +146,76 @@ io.on("connection", (socket) => {
 
     // video
     socket.on("send-video-details", (data) => {
-        videoID = v4();
+        var videoID = v4();
         data = { ...data, id: videoID };
-        insertVideoDetail(connectionDB, data);
+        insertVideoDetail(connectionDB, data , 0);
         console.log("asking for thumnail");
-        socket.emit("give-video-thumbnail");
+        socket.emit("give-video-thumbnail", videoID);
     });
 
-    socket.on("send-video", (base64data) => {
+    socket.on("send-video", (data) => {
         console.log("recieving video chunk");
-        uploadLocal(`/video/${videoID}.mp4`, base64data, socket, "video");
+        uploadLocal(
+            `/video/${data.id}.mp4`,
+            data.base64data,
+            socket,
+            "video",
+            data.id
+        );
     });
     socket.on("video-uploaded", async (data) => {
         console.log("file-uploaded successfully\n");
         socket.emit("file-uploaded", {});
-        await uploadStorage(socket, videoID, "video", storage, bucketName);
-        await uploadStorage(socket, videoID, "thumbnail", storage, bucketName);
+        await uploadStorage(socket, data.id, "video", storage, bucketName);
+        await uploadStorage(socket, data.id, "thumbnail", storage, bucketName);
         // await makeJob(socket  , videoID ,transcoderServiceClient);
     });
 
     // video-thumbnail
-    socket.on("send-video-thumbnail", (base64data) => {
+    socket.on("send-video-thumbnail", (data) => {
         console.log("recieving video-thumbnail chunk");
         uploadLocal(
-            `/thumbnail/${videoID}.png`,
-            base64data,
+            `/thumbnail/${data.id}.png`,
+            data.base64data,
             socket,
-            "video-thumbnail"
+            "video-thumbnail",
+            data.id
         );
     });
     socket.on("video-thumbnail-uploaded", (data) => {
-        socket.emit("give-video");
+        socket.emit("give-video", data.id);
     });
 
-
-
     // live
-    socket.on("send-live-details" , async (data)=>{
-        liveStreamID = v4();
+    socket.on("send-live-details", async (data) => {
+        var liveStreamID = v4();
         data = { ...data, id: liveStreamID };
-        // const channelId = await getEndpoint();
-        insertVideoDetail(connectionDB, data , 1);
-        console.log("asking for thumbnail");
-        socket.emit("give-live-thumbnail");
-    })
-    socket.on("send-live-thumbnail", (base64data) => {
+        getEndpoint(projectId,livestream_location, connectionDB, livestreamServiceClient)
+            .then((res) => {
+                console.log(res);
+                insertVideoDetail(connectionDB, data, res.id);
+                console.log("ASSIGNING channel:" , res)
+                socket.emit("send-server-details", res);
+                console.log("asking for thumbnail");
+                socket.emit("give-live-thumbnail", liveStreamID);
+            })
+            .catch((reason) => {
+                console.log("ERR", reason);
+            });
+    });
+    socket.on("send-live-thumbnail", (data) => {
         console.log("recieving live-thumbnail chunk");
         uploadLocal(
-            `/thumbnail/${liveStreamID}.png`,
-            base64data,
+            `/thumbnail/${data.id}.png`,
+            data.base64data,
             socket,
-            "live-thumbnail"
+            "live-thumbnail",
+            data.id
         );
     });
     socket.on("live-thumbnail-uploaded", (data) => {
-        uploadStorage(socket ,liveStreamID , "thumbnail" , storage , "video-streamit");
+        uploadStorage(socket, data.id, "thumbnail", storage, "video-streamit");
+        socket.emit("start-live", "nothing");
     });
 
     // dp
@@ -234,3 +251,9 @@ io.on("connection", (socket) => {
     });
 });
 
+
+
+cron.schedule('*/20 * * * *', ()=>{
+    releaseChannel(projectId , livestream_location  , livestreamServiceClient ,  connectionDB)
+    deleteLiveVideos(connectionDB)
+} ); 

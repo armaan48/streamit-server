@@ -1,3 +1,5 @@
+const { livestream_location } = require("./credentials");
+
 async function signupProcess(socket, connectionDB, data) {
     const query = `SELECT * FROM user_details WHERE username='${data.username}'`;
     connectionDB.query(query, (err, res) => {
@@ -57,10 +59,10 @@ async function getVideos(socket, connectionDB, data) {
     });
 }
 
-async function insertVideoDetail(connectionDB, data , f) {
+async function insertVideoDetail(connectionDB, data, f) {
     const query = `INSERT into video_details VALUES ?`;
     let date = new Date();
-    let creationTime = date.getTime()
+    let creationTime = date.getTime();
     const values = [
         [
             data.id,
@@ -210,21 +212,112 @@ async function searchVideoList(socket, connectionDB, keyword) {
     const query = `SELECT * FROM video_details
                     WHERE MATCH(title, tags, description) AGAINST (?)`;
     const values = [keyword];
-    connectionDB.query(query , values , (err , res)=>{
-        if (!err){
+    connectionDB.query(query, values, (err, res) => {
+        if (!err) {
             var videoList = JSON.parse(JSON.stringify(res));
-            console.log(`${keyword} search result len ${videoList} `)
-            socket.emit("send-search-video-list" , videoList)
-        }else{
-            console.log(err)
+            console.log(`${keyword} search result len ${videoList} `);
+            socket.emit("send-search-video-list", videoList);
+        } else {
+            console.log(err);
         }
-    })
+    });
 }
 
-async function getEndpoint(socket , connectionDB , livestreamServiceClient ){
+async function getEndpoint(
+    projectId,
+    livestream_location,
+    connectionDB,
+    livestreamServiceClient
+) {
+    for (var tr = 1; tr <= 5; tr++) {
+        var id = Math.floor(Math.random() * 10) + 1;
 
+        var channelId = `streamit-server-channel-${id}`;
+        const request = {
+            name: livestreamServiceClient.channelPath(
+                projectId,
+                livestream_location,
+                channelId
+            ),
+        };
+        const [channel] = await livestreamServiceClient.getChannel(request);
+        if (channel.streamingState == "STOPPED") {
+            livestreamServiceClient.startChannel(request);
+            var query = `UPDATE livestream_details SET lastAccessed = ? , isReleased = ?`;
+            var date = new Date();
+            values = [date.getTime(), 0];
+            await connectionDB.query(query, values, (err, res) => {});
+            query = `SELECT * FROM livestream_details WHERE id = ?`;
+            values = [id];
+            return new Promise((resolve, reject) => {
+                connectionDB.query(query, values, (err, res) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(JSON.parse(JSON.stringify(res[0])));
+                    }
+                });
+            });
+        }
+    }
+    return new Promise((resolve, reject) => {
+        reject("cant find");
+    });
 }
 
+async function releaseChannel(
+    projectId,
+    livestream_location,
+    livestreamServiceClient,
+    connectionDB
+) {
+    console.log("hi\n");
+    const tenMinutesAgo = [new Date().getTime() - 10000];
+
+    try {
+        const query = `
+        SELECT *
+        FROM livestream_details
+        WHERE lastAccessed < ? AND isReleased = 0`;
+        connectionDB.query(query, tenMinutesAgo, async (err, channels) => {
+            var listOfChannels = JSON.parse(JSON.stringify(channels));
+
+            for (const channel of listOfChannels) {
+                const channelId = `streamit-server-channel-${channel.id}`; // Assuming 'id' is a valid column
+                const request = {
+                    name: livestreamServiceClient.channelPath(
+                        projectId,
+                        livestream_location,
+                        channelId
+                    ),
+                };
+
+                try {
+                    const [operation] = await livestreamServiceClient.stopChannel(request);
+                    await livestreamServiceClient.stopChannel(request);
+                    const updateQuery = `
+                UPDATE livestream_details
+                SET isReleased = 1
+                WHERE id = ?`;
+                    connectionDB.query(updateQuery, [channel.id]);
+                } catch (err) {
+                    console.error(`Error updating channel ${channelId}:`, err);
+                }
+                console.log(`handled channel-${channel.id} `);
+            }
+        });
+    } catch (err) {
+        console.error(`Error fetching channels:`, err);
+    }
+}
+async function deleteLiveVideos(connectionDB) {
+    const tenMinutesAgo = [new Date().getTime() - 12000];
+    const query = `
+        DELETE 
+        FROM video_details
+        WHERE creationtime < ? AND is_live != 0`;
+    connectionDB.query(query, tenMinutesAgo);
+}
 module.exports = {
     signupProcess,
     insertSignUpData,
@@ -238,5 +331,8 @@ module.exports = {
     followingList,
     updateWatchMins,
     incrementViews,
-    searchVideoList
+    searchVideoList,
+    getEndpoint,
+    releaseChannel,
+    deleteLiveVideos
 };

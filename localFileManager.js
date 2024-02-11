@@ -10,13 +10,13 @@ async function deleteLocal(directory) {
     });
 }
 
-async function uploadLocal(fileName,  data, socket , type) {
+async function uploadLocal(fileName,  data, socket , type , fileID) {
     const decodedData = Buffer.from(data, "base64");
     const filePath = path.join(__dirname , fileName);
     if (!fs.existsSync(filePath))
         fs.writeFileSync(filePath , '');
     fs.appendFileSync( filePath, decodedData);
-    socket.emit(`give-${type}`);
+    socket.emit(`give-${type}` , fileID);
 }
 
 module.exports = {deleteLocal , uploadLocal};
