@@ -263,7 +263,7 @@ io.on("connection", (socket) => {
 
 
 
-cron.schedule('*/20 * * * *', ()=>{
+cron.schedule('*/10 * * * *', ()=>{
     releaseChannel(projectId , livestream_location  , livestreamServiceClient ,  connectionDB)
     deleteLiveVideos(connectionDB)
 } ); 

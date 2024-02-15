@@ -23,8 +23,8 @@ async function insertSignUpData(socket, connectionDB, data) {
             data.publicKey,
             data.encryptedPrivateKey,
             data.encryptedPassword,
-            0
-        ],  
+            0,
+        ],
     ];
 
     await connectionDB.query(query, [values], (err, result) => {
@@ -130,13 +130,13 @@ async function eventFollow(socket, connectionDB, data, f) {
                 );
             }
         });
-        query = `UPDATE user_details SET follower_count = follower_count + ? WHERE username = ?`
-        values = [1 , data.following_id]
-        connectionDB.query(query , values , (err,res)=>{
-            if (!err){
+        query = `UPDATE user_details SET follower_count = follower_count + ? WHERE username = ?`;
+        values = [1, data.following_id];
+        connectionDB.query(query, values, (err, res) => {
+            if (!err) {
                 console.log("subscriber incremented");
-            }else{
-                console.log("ERR" , err);
+            } else {
+                console.log("ERR", err);
             }
         });
     } else {
@@ -149,13 +149,13 @@ async function eventFollow(socket, connectionDB, data, f) {
                 );
             }
         });
-        query = `UPDATE user_details SET follower_count = follower_count - ? WHERE username = ?`
-        values = [1 , data.following_id]
-        connectionDB.query(query , values , (err,res)=>{
-            if (!err){
+        query = `UPDATE user_details SET follower_count = follower_count - ? WHERE username = ?`;
+        values = [1, data.following_id];
+        connectionDB.query(query, values, (err, res) => {
+            if (!err) {
                 console.log("subscriber decremented");
-            }else{
-                console.log("ERR" , err);
+            } else {
+                console.log("ERR", err);
             }
         });
     }
@@ -312,16 +312,16 @@ async function releaseChannel(
                 };
 
                 try {
-                    const [operation] = await livestreamServiceClient.stopChannel(request);
+                    const [operation] =
+                        await livestreamServiceClient.stopChannel(request);
                     await livestreamServiceClient.stopChannel(request);
-                    const updateQuery = `
+                } catch (err) {}
+                const updateQuery = `
                 UPDATE livestream_details
                 SET isReleased = 1
                 WHERE id = ?`;
-                    connectionDB.query(updateQuery, [channel.id]);
-                } catch (err) {
-                    console.error(`Error updating channel ${channelId}:`, err);
-                }
+                connectionDB.query(updateQuery, [channel.id]);
+
                 console.log(`handled channel-${channel.id} `);
             }
         });
@@ -337,18 +337,17 @@ async function deleteLiveVideos(connectionDB) {
         WHERE creationtime < ? AND is_live != 0`;
     connectionDB.query(query, min12);
 }
-async function giveUserData(socket , connectionDB , username){
-    var query = `SELECT * FROM user_details where username = ?`
-    var values = [username]
-    console.log(username)
-    connectionDB.query(query , values , (err , res)=>{
-        if (!err){
+async function giveUserData(socket, connectionDB, username) {
+    var query = `SELECT * FROM user_details where username = ?`;
+    var values = [username];
+    console.log(username);
+    connectionDB.query(query, values, (err, res) => {
+        if (!err) {
             console.log(res);
             const data = JSON.parse(JSON.stringify(res[0]));
-            socket.emit("send-user-data" , data);
+            socket.emit("send-user-data", data);
         }
-    })
-
+    });
 }
 module.exports = {
     signupProcess,
@@ -367,5 +366,5 @@ module.exports = {
     getEndpoint,
     releaseChannel,
     deleteLiveVideos,
-    giveUserData
+    giveUserData,
 };
