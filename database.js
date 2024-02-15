@@ -23,7 +23,8 @@ async function insertSignUpData(socket, connectionDB, data) {
             data.publicKey,
             data.encryptedPrivateKey,
             data.encryptedPassword,
-        ],
+            0
+        ],  
     ];
 
     await connectionDB.query(query, [values], (err, result) => {
@@ -32,7 +33,7 @@ async function insertSignUpData(socket, connectionDB, data) {
             socket.emit("failSignUp", "UserNameTaken");
         } else {
             console.log("values inserted\ngive-dp");
-            socket.emit("give-dp", "success");
+            socket.emit("give-dp", data.username);
         }
     });
 }
@@ -120,23 +121,41 @@ async function eventLike(socket, connectionDB, data, f) {
 
 async function eventFollow(socket, connectionDB, data, f) {
     if (f) {
-        const query = `INSERT into follow_details VALUES ?`;
-        const values = [[data.follower_id, data.following_id]];
-        await connectionDB.query(query, [values], (err, result) => {
+        var query = `INSERT into follow_details VALUES ?`;
+        var values = [[data.follower_id, data.following_id]];
+        connectionDB.query(query, [values], (err, result) => {
             if (!err) {
                 console.log(
                     `${data.follower_id} followed ${data.following_id}`
                 );
             }
         });
+        query = `UPDATE user_details SET follower_count = follower_count + ? WHERE username = ?`
+        values = [1 , data.following_id]
+        connectionDB.query(query , values , (err,res)=>{
+            if (!err){
+                console.log("subscriber incremented");
+            }else{
+                console.log("ERR" , err);
+            }
+        });
     } else {
-        const query = `DELETE from follow_details WHERE follower_id = ? AND following_id = ?`;
-        const values = [data.follower_id, data.following_id];
-        await connectionDB.query(query, values, (err, result) => {
+        var query = `DELETE from follow_details WHERE follower_id = ? AND following_id = ?`;
+        var values = [data.follower_id, data.following_id];
+        connectionDB.query(query, values, (err, result) => {
             if (!err) {
                 console.log(
                     `${data.follower_id} unfollowed ${data.following_id}`
                 );
+            }
+        });
+        query = `UPDATE user_details SET follower_count = follower_count - ? WHERE username = ?`
+        values = [1 , data.following_id]
+        connectionDB.query(query , values , (err,res)=>{
+            if (!err){
+                console.log("subscriber decremented");
+            }else{
+                console.log("ERR" , err);
             }
         });
     }
@@ -311,12 +330,25 @@ async function releaseChannel(
     }
 }
 async function deleteLiveVideos(connectionDB) {
-    const tenMinutesAgo = [new Date().getTime() - 12000];
+    const min12 = [new Date().getTime() - 12000];
     const query = `
         DELETE 
         FROM video_details
         WHERE creationtime < ? AND is_live != 0`;
-    connectionDB.query(query, tenMinutesAgo);
+    connectionDB.query(query, min12);
+}
+async function giveUserData(socket , connectionDB , username){
+    var query = `SELECT * FROM user_details where username = ?`
+    var values = [username]
+    console.log(username)
+    connectionDB.query(query , values , (err , res)=>{
+        if (!err){
+            console.log(res);
+            const data = JSON.parse(JSON.stringify(res[0]));
+            socket.emit("send-user-data" , data);
+        }
+    })
+
 }
 module.exports = {
     signupProcess,
@@ -334,5 +366,6 @@ module.exports = {
     searchVideoList,
     getEndpoint,
     releaseChannel,
-    deleteLiveVideos
+    deleteLiveVideos,
+    giveUserData
 };

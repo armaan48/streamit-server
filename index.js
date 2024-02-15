@@ -24,7 +24,8 @@ const {
     searchVideoList,
     getEndpoint,
     releaseChannel,
-    deleteLiveVideos
+    deleteLiveVideos,
+    giveUserData
 } = require("./database");
 const {
     projectId,
@@ -143,6 +144,9 @@ io.on("connection", (socket) => {
     socket.on("give-search-video-list", (keyword) => {
         searchVideoList(socket, connectionDB, keyword);
     });
+    socket.on("give-user-data" , (username)=>{
+        giveUserData(socket ,connectionDB , username)
+    })
 
     // video
     socket.on("send-video-details", (data) => {
@@ -168,7 +172,7 @@ io.on("connection", (socket) => {
         socket.emit("file-uploaded", {});
         await uploadStorage(socket, data.id, "video", storage, bucketName);
         await uploadStorage(socket, data.id, "thumbnail", storage, bucketName);
-        // await makeJob(socket  , videoID ,transcoderServiceClient);
+        await makeJob(socket  , data.id ,transcoderServiceClient);
     });
 
     // video-thumbnail
@@ -219,11 +223,17 @@ io.on("connection", (socket) => {
     });
 
     // dp
-    socket.on("send-dp", async (base64data) => {
-        await uploadLocal(`/dp/${userName}.png`, base64data, socket, "dp");
+    socket.on("send-dp", async (data) => {
+        uploadLocal(
+            `/dp/${data.id}.png`,
+            data.base64data,
+            socket,
+            "dp",
+            data.id
+        );
     });
     socket.on("dp-uploaded", async (data) => {
-        await uploadDp(userName, storage, "user-streamit/");
+        uploadDp(data.id, storage, "user-streamit/");
     });
 
     // like , unlike ,  follow unfollow
